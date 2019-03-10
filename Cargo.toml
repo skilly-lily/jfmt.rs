@@ -1,0 +1,11 @@
+[package]
+name = "jfmt"
+version = "0.1.0"
+authors = ["wes"]
+edition = "2018"
+
+[dependencies]
+clap = "*"
+serde = "*"
+serde_json = "*"
+serde-transcode = "*"
