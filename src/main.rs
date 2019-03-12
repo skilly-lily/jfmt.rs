@@ -111,7 +111,7 @@ fn debug_reader(mut reader: impl Read) {
 fn main() -> IOResult<()> {
     let matches = App::new("jfmt")
         .arg(Arg::with_name("INPUT").index(1))
-        .arg(Arg::with_name("compact").long("compact"))
+        .arg(Arg::with_name("compact").long("compact").short("c"))
         .get_matches();
     let input = matches.value_of("INPUT").unwrap_or("-");
     let compact = matches.is_present("compact");
