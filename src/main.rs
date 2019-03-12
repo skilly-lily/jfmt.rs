@@ -101,8 +101,8 @@ fn get_writer(file: Option<File>) -> BufWriter<Output> {
     BufWriter::new(writer)
 }
 
-fn open_output_file(name: &str) -> IOResult<File> {
-    OpenOptions::new().write(true).create_new(true).open(name)
+fn open_output_file(name: &str, exist_ok: bool) -> IOResult<File> {
+    OpenOptions::new().write(true).create(true).create_new(!exist_ok).open(name)
 }
 
 fn get_temp_file_name(name: &str) -> String {
@@ -126,25 +126,33 @@ fn main() -> IOResult<()> {
         .arg(Arg::with_name("INPUT").index(1))
         .arg(Arg::with_name("compact").long("compact").short("c"))
         .arg(Arg::with_name("in-place").long("in-place").short("i"))
+        .arg(Arg::with_name("output").long("output-file").short("o").takes_value(true))
         .get_matches();
     let input = matches.value_of("INPUT").unwrap_or("-");
     let compact = matches.is_present("compact");
     let in_place = matches.is_present("in-place");
+    let output = matches.value_of("output");
 
     let in_file = get_input_file(input)?;
-    let out_file_name = match (in_place, &in_file) {
-        (true, None) => {
+    let out_file_name: Option<String> = match (in_place, &in_file, output) {
+        (true, None, _) => {
             eprintln!("Cannot combine stdin with --in-place");
             return Err(io::Error::from(io::ErrorKind::InvalidInput));
-        }
-        _ => Some(get_temp_file_name(input)),
+        },
+        (true, _, Some(_)) => {
+            eprintln!("Cannot combine --output-file with --in-place");
+            return Err(io::Error::from(io::ErrorKind::InvalidInput));
+        },
+        (true, _, None) => Some(get_temp_file_name(input)),
+        (false, _, Some(x)) => Some(x.to_owned()),
+        (false, _, None) => None
     };
 
     let reader = get_reader(in_file);
-    let writer = match in_place {
-        false => get_writer(None),
-        true => {
-            let out_file = open_output_file(&out_file_name.as_ref().unwrap())?;
+    let writer = match &out_file_name {
+        None => get_writer(None),
+        Some(x) => {
+            let out_file = open_output_file(&x, !in_place)?;
             get_writer(Some(out_file))
         }
     };
