@@ -6,9 +6,11 @@ use serde_json::ser::{CompactFormatter, PrettyFormatter};
 use serde_json::{Deserializer, Serializer};
 use serde_transcode::transcode;
 
-use std::fs::File;
+use std::fs::{self, File, OpenOptions};
 use std::io::prelude::*;
 use std::io::{self, stdin, stdout, BufReader, BufWriter};
+
+const BACKUP_EXT: &str = ".inplace~";
 
 type IOResult<T> = io::Result<T>;
 
@@ -99,6 +101,17 @@ fn get_writer(file: Option<File>) -> BufWriter<Output> {
     BufWriter::new(writer)
 }
 
+fn open_output_file(name: &str) -> IOResult<File> {
+    OpenOptions::new().write(true).create_new(true).open(name)
+}
+
+fn get_temp_file_name(name: &str) -> String {
+    let mut new_name = name.to_owned();
+    new_name.push_str(BACKUP_EXT);
+
+    new_name
+}
+
 #[allow(dead_code)]
 fn debug_reader(mut reader: impl Read) {
     let mut strbuf = String::new();
@@ -112,12 +125,29 @@ fn main() -> IOResult<()> {
     let matches = App::new("jfmt")
         .arg(Arg::with_name("INPUT").index(1))
         .arg(Arg::with_name("compact").long("compact").short("c"))
+        .arg(Arg::with_name("in-place").long("in-place").short("i"))
         .get_matches();
     let input = matches.value_of("INPUT").unwrap_or("-");
     let compact = matches.is_present("compact");
+    let in_place = matches.is_present("in-place");
 
-    let reader = get_reader(get_input_file(input)?);
-    let writer = get_writer(None);
+    let in_file = get_input_file(input)?;
+    let out_file_name = match (in_place, &in_file) {
+        (true, None) => {
+            eprintln!("Cannot combine stdin with --in-place");
+            return Err(io::Error::from(io::ErrorKind::InvalidInput));
+        }
+        _ => Some(get_temp_file_name(input)),
+    };
+
+    let reader = get_reader(in_file);
+    let writer = match in_place {
+        false => get_writer(None),
+        true => {
+            let out_file = open_output_file(&out_file_name.as_ref().unwrap())?;
+            get_writer(Some(out_file))
+        }
+    };
 
     let result: Result<(), serde_json::Error> = match compact {
         false => pretty_print(reader, writer),
@@ -126,6 +156,12 @@ fn main() -> IOResult<()> {
 
     if let Err(x) = result {
         eprintln!("error: {}", x.to_string());
+    };
+
+    if in_place {
+        let out_file_name = out_file_name.unwrap();
+        fs::rename(&out_file_name, input)?;
+        // fs::remove_file(&out_file_name)?;
     };
 
     Ok(())
