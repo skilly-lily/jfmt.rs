@@ -102,7 +102,11 @@ fn get_writer(file: Option<File>) -> BufWriter<Output> {
 }
 
 fn open_output_file(name: &str, exist_ok: bool) -> IOResult<File> {
-    OpenOptions::new().write(true).create(true).create_new(!exist_ok).open(name)
+    OpenOptions::new()
+        .write(true)
+        .create(true)
+        .create_new(!exist_ok)
+        .open(name)
 }
 
 fn get_temp_file_name(name: &str) -> String {
@@ -126,7 +130,12 @@ fn main() -> IOResult<()> {
         .arg(Arg::with_name("INPUT").index(1))
         .arg(Arg::with_name("compact").long("compact").short("c"))
         .arg(Arg::with_name("in-place").long("in-place").short("i"))
-        .arg(Arg::with_name("output").long("output-file").short("o").takes_value(true))
+        .arg(
+            Arg::with_name("output")
+                .long("output-file")
+                .short("o")
+                .takes_value(true),
+        )
         .get_matches();
     let input = matches.value_of("INPUT").unwrap_or("-");
     let compact = matches.is_present("compact");
@@ -138,14 +147,14 @@ fn main() -> IOResult<()> {
         (true, None, _) => {
             eprintln!("Cannot combine stdin with --in-place");
             return Err(io::Error::from(io::ErrorKind::InvalidInput));
-        },
+        }
         (true, _, Some(_)) => {
             eprintln!("Cannot combine --output-file with --in-place");
             return Err(io::Error::from(io::ErrorKind::InvalidInput));
-        },
+        }
         (true, _, None) => Some(get_temp_file_name(input)),
         (false, _, Some(x)) => Some(x.to_owned()),
-        (false, _, None) => None
+        (false, _, None) => None,
     };
 
     let reader = get_reader(in_file);
