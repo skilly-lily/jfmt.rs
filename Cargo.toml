@@ -13,6 +13,7 @@ files directly."""
 readme = "README.md"
 documentation = "https://github.com/scruffystuffs/jfmt.rs"
 homepage = "https://github.com/scruffystuffs/jfmt.rs"
+repository = "https://github.com/scruffystuffs/jfmt.rs"
 
 [dependencies]
 clap = "2.32.0"
