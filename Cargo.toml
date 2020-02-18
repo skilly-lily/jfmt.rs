@@ -1,11 +1,22 @@
 [package]
 name = "jfmt"
-version = "0.1.0"
-authors = ["wes"]
+version = "1.0.0"
+authors = ["Wes Van Melle <van.melle.wes@gmail.com>"]
 edition = "2018"
+license = "MIT"
+keywords = ["json", "formatter", "cli"]
+categories = ["command-line-utilities", "text-processing"]
+description = """
+jfmt is a command-line tool for formatting json files in both readable and
+compact formats.  It supports stdin/stdout shell usage, as well as working on
+files directly."""
+readme = "README.md"
+documentation = "https://github.com/scruffystuffs/jfmt.rs"
+homepage = "https://github.com/scruffystuffs/jfmt.rs"
+repositiory = "https://github.com/scruffystuffs/jfmt.rs"
 
 [dependencies]
-clap = "*"
-serde = "*"
-serde_json = "*"
-serde-transcode = "*"
+clap = "2.32.0"
+serde = "1.0.89"
+serde_json = "1.0.39"
+serde-transcode = "1.1.0"
