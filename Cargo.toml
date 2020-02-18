@@ -14,6 +14,10 @@ readme = "README.md"
 documentation = "https://github.com/scruffystuffs/jfmt.rs"
 homepage = "https://github.com/scruffystuffs/jfmt.rs"
 repository = "https://github.com/scruffystuffs/jfmt.rs"
+include = [
+    "src/main.rs",
+    "Cargo.toml"
+]
 
 [dependencies]
 clap = "2.32.0"
