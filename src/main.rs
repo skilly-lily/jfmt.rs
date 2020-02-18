@@ -148,6 +148,7 @@ fn get_output_file_name(
 
 fn parse_cli<'a>() -> JfmtConfig {
     let matches = App::new("jfmt")
+        .version(clap::crate_version!())
         .arg(Arg::with_name("INPUT").index(1))
         .arg(Arg::with_name("compact").long("compact").short("c"))
         .arg(Arg::with_name("in-place").long("in-place").short("i"))
