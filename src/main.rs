@@ -103,6 +103,7 @@ fn get_writer(file: Option<File>) -> BufWriter<Output> {
 fn open_output_file(name: &str, exist_ok: bool) -> IOResult<File> {
     OpenOptions::new()
         .write(true)
+        .truncate(true)
         .create(true)
         .create_new(!exist_ok)
         .open(name)
