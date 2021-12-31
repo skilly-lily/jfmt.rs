@@ -8,6 +8,7 @@ use serde_json::ser::{CompactFormatter, PrettyFormatter};
 use serde_json::{Deserializer, Serializer};
 use serde_transcode::transcode;
 
+use std::borrow::ToOwned;
 use std::fs::{self, File, OpenOptions};
 use std::io::prelude::*;
 use std::io::{self, stdin, stdout, BufReader, BufWriter};
@@ -51,16 +52,22 @@ impl Write for Output {
     }
 }
 
+enum Indentation {
+    Spaces(u8),
+    Tabs
+}
+
 struct JfmtConfig {
     pub input: String,
     pub output: Option<String>,
     pub compact: bool,
     pub in_place: bool,
+    pub indent: Indentation,
 }
 
-fn pretty_print(input: impl Read, output: impl Write) -> Result<(), serde_json::error::Error> {
+fn pretty_print(input: impl Read, output: impl Write, indent: &str) -> Result<(), serde_json::error::Error> {
     let mut decoder = Deserializer::from_reader(input);
-    let mut encoder = Serializer::with_formatter(output, PrettyFormatter::with_indent(b"    "));
+    let mut encoder = Serializer::with_formatter(output, PrettyFormatter::with_indent(indent.as_bytes()));
 
     transcode(&mut decoder, &mut encoder)
 }
@@ -141,18 +148,21 @@ fn get_output_file_name(
             return Err(io::Error::from(io::ErrorKind::InvalidInput));
         }
         (true, _, None) => Some(get_temp_file_name(input)),
-        (false, _, Some(x)) => Some(x.to_owned()),
+        (false, _, Some(x)) => Some(x.clone()),
         (false, _, None) => None,
     };
     Ok(name)
 }
 
-fn parse_cli<'a>() -> JfmtConfig {
+fn parse_cli() -> JfmtConfig {
+    use Indentation::{Spaces, Tabs};
     let matches = App::new("jfmt")
         .version(clap::crate_version!())
         .arg(Arg::with_name("INPUT").index(1))
         .arg(Arg::with_name("compact").long("compact").short("c"))
         .arg(Arg::with_name("in-place").long("in-place").short("i"))
+        .arg(Arg::with_name("spaces").long("spaces").short("s").takes_value(true))
+        .arg(Arg::with_name("tabs").long("tabs").short("t"))
         .arg(
             Arg::with_name("output")
                 .long("output-file")
@@ -161,15 +171,28 @@ fn parse_cli<'a>() -> JfmtConfig {
         )
         .get_matches();
     let input = matches.value_of("INPUT").unwrap_or("-").to_owned();
-    let output = matches.value_of("output").map(|s| s.to_owned());
+    let output = matches.value_of("output").map(ToOwned::to_owned);
     let compact = matches.is_present("compact");
     let in_place = matches.is_present("in-place");
+    let space_indent = matches.value_of("spaces").map(|s| s.parse().expect("--spaces must be an integer (1-16)."));
+    let tab_indent = matches.is_present("tabs");
+
+    let indent = match (space_indent, tab_indent) {
+        (None, false) => Spaces(4),
+        (None, true) => Tabs,
+        (Some(spaces), false) => {
+            assert!((1..=16).contains(&spaces), "--spaces must be an integer 1-16 (found: {})", spaces);
+            Spaces(spaces)
+        }
+        (Some(_), true) => panic!("Cannot use --spaces and --tabs together")
+    };
 
     JfmtConfig {
         input,
         output,
         compact,
         in_place,
+        indent,
     }
 }
 
@@ -183,7 +206,7 @@ fn real_main() -> IOResult<()> {
     let writer = match &out_file_name {
         None => get_writer(None),
         Some(x) => {
-            let out_file = open_output_file(&x, !cfg.in_place)?;
+            let out_file = open_output_file(x, !cfg.in_place)?;
             get_writer(Some(out_file))
         }
     };
@@ -191,7 +214,8 @@ fn real_main() -> IOResult<()> {
     let result: Result<(), serde_json::Error> = if cfg.compact {
         compact_print(reader, writer)
     } else {
-        pretty_print(reader, writer)
+        let indent_str = resolve_indent(&cfg.indent);
+        pretty_print(reader, writer, &indent_str)
     };
 
     if let Err(x) = result {
@@ -205,6 +229,14 @@ fn real_main() -> IOResult<()> {
     };
 
     Ok(())
+}
+
+fn resolve_indent(indent: &Indentation) -> String {
+    use Indentation::{Spaces, Tabs};
+    match indent {
+        Spaces(n) => "".repeat(*n as usize),
+        Tabs => "\t".to_owned()
+    }
 }
 
 fn main() {
