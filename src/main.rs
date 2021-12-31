@@ -234,7 +234,7 @@ fn real_main() -> IOResult<()> {
 fn resolve_indent(indent: &Indentation) -> String {
     use Indentation::{Spaces, Tabs};
     match indent {
-        Spaces(n) => "".repeat(*n as usize),
+        Spaces(n) => " ".repeat(*n as usize),
         Tabs => "\t".to_owned()
     }
 }
