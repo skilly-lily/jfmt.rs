@@ -20,7 +20,7 @@ include = [
 ]
 
 [dependencies]
-clap = "2.32.0"
-serde = "1.0.89"
-serde_json = "1.0.39"
-serde-transcode = "1.1.0"
+clap = "2.34.0"
+serde = "1.0.132"
+serde_json = "1.0.73"
+serde-transcode = "1.1.1"
