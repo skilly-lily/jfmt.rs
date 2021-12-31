@@ -1,6 +1,6 @@
 [package]
 name = "jfmt"
-version = "1.0.1"
+version = "1.1.0"
 authors = ["Wes Van Melle <van.melle.wes@gmail.com>"]
 edition = "2018"
 license = "MIT"
