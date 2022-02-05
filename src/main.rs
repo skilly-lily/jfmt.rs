@@ -158,15 +158,15 @@ fn parse_cli() -> JfmtConfig {
     use Indentation::{Spaces, Tabs};
     let matches = App::new("jfmt")
         .version(clap::crate_version!())
-        .arg(Arg::with_name("INPUT").index(1))
-        .arg(Arg::with_name("compact").long("compact").short("c"))
-        .arg(Arg::with_name("in-place").long("in-place").short("i"))
-        .arg(Arg::with_name("spaces").long("spaces").short("s").takes_value(true))
-        .arg(Arg::with_name("tabs").long("tabs").short("t"))
+        .arg(Arg::new("INPUT").index(1))
+        .arg(Arg::new("compact").long("compact").short('c'))
+        .arg(Arg::new("in-place").long("in-place").short('i'))
+        .arg(Arg::new("spaces").long("spaces").short('s').takes_value(true))
+        .arg(Arg::new("tabs").long("tabs").short('t'))
         .arg(
-            Arg::with_name("output")
+            Arg::new("output")
                 .long("output-file")
-                .short("o")
+                .short('o')
                 .takes_value(true),
         )
         .get_matches();
@@ -219,7 +219,7 @@ fn real_main() -> IOResult<()> {
     };
 
     if let Err(x) = result {
-        eprintln!("error: {}", x.to_string());
+        eprintln!("error: {}", x);
     };
 
     if cfg.in_place {
