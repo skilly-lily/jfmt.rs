@@ -78,7 +78,7 @@ and `pretty.json`
 - Accept input from stdin, print to stdout, useful for shell pipelines.
 - Safe in-place modifcation, files are not modified unless success is guaranteed.
 - Straightforward format control: tabs or spaces, or no whitespace at all.
-- Fast!  See [the benchmarks section.](#Performance_comparison)
+- Fast!  See [the performance comparison section.](#performance-comparison)
 
 ### Examples
 
