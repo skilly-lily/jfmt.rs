@@ -206,12 +206,12 @@ off of the total time to give us our rough actual time estimate.
 For `jq`, you have to specify a filter when piping to `/dev/null` (honestly not
 sure why).  We use the passthough filter of `.` to give us a final invocation of:
 
-For `json_pp -t null`, we omit the trailing `> /dev/null`, since that is the
-purpose of `-t null`.
-
 ```bash
 time cat large_file.json | jq '.' > /dev/null
 ```
+
+For `json_pp -t null`, we omit the trailing `> /dev/null`, since that is the
+purpose of `-t null`.
 
 | Tool              | Total Time    | Time without `cat`    | `jfmt` speedup factor |
 | ---               | ---           | ---                   | ---                   |
