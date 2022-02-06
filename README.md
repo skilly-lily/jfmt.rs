@@ -130,8 +130,8 @@ tool.  While `jq --help` is both well-written and concise, `jq` does more,
 and has more to explain.  Additionally `jq` has be able to make JSON
 modifications, which requires a full JSON handling engine and query language.
 
-`jfmt` is also about 3-4 times faster than `jq`, mostly because it simply does
-less. Try it yourself if you're unsure.
+`jfmt` is also about 3-4 times faster than `jq` in the worst case, mostly
+because it simply does less. Try it yourself if you're unsure.
 
 With that said, `jfmt` offers none of the query/modify features that `jq` does,
 and never will.  If you need that, I personally recommend using `jq`.
@@ -144,7 +144,7 @@ in Perl.  It produces other formats, including a Perl-specific format (or
 whatever the Dumper format actually is, I don't care to check.)
 
 Comparing `jq` and `json_pp` on the same 25MB input shows `json_pp` to be over
-20 times slower than `jq` (which is about 3-4 times slower than jfmt on the
+70 times slower than `jq` (which is about 3-4 times slower than jfmt on the
 same).  `json_pp` also does not have any options for dealing with files, only
 stdin and stdout.
 
