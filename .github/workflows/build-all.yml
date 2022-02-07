@@ -68,6 +68,7 @@ jobs:
       - uses: softprops/action-gh-release@v1
         with:
           body_path: changes/${{ github.ref_name }}.md
+          name: v${{ github.ref_name }}
           files: binaries/jfmt_*
           draft: true
         env:
