@@ -1,82 +1,74 @@
-name: Rust
+name: Publish
 
 on: [push]
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    name: Build ${{ matrix.alias }}
+    runs-on: ${{ matrix.runner }}
 
+    strategy:
+      matrix:
+        include:
+          - alias: mac-M1
+            runner: macos-latest
+            target: aarch64-apple-darwin
+            suffix: ""
+          - alias: mac-x64
+            runner: macos-latest
+            target: x86_64-apple-darwin
+            suffix: ""
+          - alias: windows
+            runner: windows-latest
+            target: x86_64-pc-windows-msvc
+            suffix: ".exe"
+          - alias: linux
+            runner: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            suffix: ""
     steps:
       - name: Checkout
         uses: actions/checkout@v2
 
-      - name: Install latest rust toolchain
-        uses: actions-rs/toolchain@v1
+      - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
-          default: true
-          override: true
+          target: ${{ matrix.target }}
+          profile: minimal
 
-      - name: Build
-        run: cargo build --all --release && strip target/release/jfmt && mv target/release/jfmt target/release/jfmt_amd64
-
-      - name: Release
-        uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/')
+      - uses: actions-rs/cargo@v1
         with:
-          files: |
-            target/release/jfmt_amd64
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          command: build
+          args: --release --target ${{matrix.target}} 
+          use-cross: true
 
-  build-win:
-    runs-on: windows-latest
+      - name: Move binaries
+        run: |
+          mkdir release
+          cp target/${{ matrix.target }}/release/jfmt${{ matrix.suffix }} release/jfmt_${{ matrix.target }}${{ matrix.suffix }}
+
+      - uses: actions/upload-artifact@v2
+        with:
+          name: binaries
+          path: release
+
+  release:
+    name: Publish release
+    if: ${{ startsWith(github.ref, 'refs/tags/') }}
+    needs: build
+    runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v1
-
-      - name: Install latest rust toolchain
-        uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v2
+      - uses: actions/download-artifact@v2
+      - name: Debug binaries path
+        run: |
+          ls -Al
+          ls -R binaries
+      - uses: softprops/action-gh-release@v1
         with:
-          toolchain: stable
-          default: true
-          override: true
-
-      - name: Build
-        run: cargo build --all --release
-
-      - name: Release
-        uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/')
-        with:
-          files: target/release/jfmt.exe
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  build-mac:
-    runs-on: macos-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v1
-
-      - name: Install latest rust toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          target: x86_64-apple-darwin
-          default: true
-          override: true
-
-      - name: Build for mac
-        run: cargo build --all --release && strip target/release/jfmt && mv target/release/jfmt target/release/jfmt_darwin
-
-      - name: Release
-        uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/')
-        with:
-          files: |
-            target/release/jfmt_darwin
+          body_path: changes/${{ github.ref_name }}.md
+          files: binaries/jfmt_*
+          draft: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
