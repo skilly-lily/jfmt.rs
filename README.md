@@ -136,6 +136,24 @@ because it simply does less. Try it yourself if you're unsure.
 With that said, `jfmt` offers none of the query/modify features that `jq` does,
 and never will.  If you need that, I personally recommend using `jq`.
 
+### Why not use `python -m json.tool`?
+
+I have a decent amount of experience writing python, and I had no idea this
+tool existed.  I wish I had known, since it's actually quite fast.  If I had
+known about this before I wrote `jfmt`, I may have just submitted changes to the
+python standard library, or forked it into a python package and made my own
+updates.
+
+While this tool performed the worst on the small file, it performed quite
+well on the large file, coming in second place.  While most uses will be smaller
+files, the speed is still relatively fast for a human.  In this light, `json.tool`
+is clearly a good tool for the job.  Additionally, the help text is clear and
+fairly obvious.
+
+Hoever, there are very few options for configuring the output format, which
+have been quite useful to me, and the performance is strictly worse.  For
+those reasons, I still pick `jfmt`, though this is the closest second.
+
 ### Why not use `json_pp`?
 
 Ok, be honest, did you know about `json_pp`?  Short version: it's a JSON
@@ -149,7 +167,15 @@ same).  `json_pp` also does not have any options for dealing with files, only
 stdin and stdout.
 
 Unless you need the Perl stuff (may god have mercy on your soul), just use
-`jfmt` or `jq`.
+one of the other tools.
+
+### Why not use `$SOME_NPM_PACKAGE`?
+
+I don't like javascript, and I prefer to use things that aren't written in
+javascript if I can help it.  If you can find an NPM package (written in TS/JS)
+that outperforms `jfmt` (unlikely) and has an interface you like, feel free
+to use that instead.  However, I was never going to pick those over writing
+`jfmt` from scratch, and I doubt that'll change now.
 
 ### Why not use `$MY_FAVORITE_TOOL`?
 
@@ -183,11 +209,12 @@ compact.json` showed average times of ~700us, so we can use that to subtract
 the running time of cat, leaving us with very little overhead variance, and
 a rough estimate of time spent actually running the tools.
 
-| Tool      | Total time    | Time without `cat`    | `jfmt` speedup factor |
-| ---       | ---           | ---                   | ---                   |
-| `jfmt`    | 837us         | 137us                 | N/A                   |
-| `jq`      | 1,750us       | 1,050us               | 7.7x                  |
-| `json_pp` | 16,200us      | 15,500us              | 113x                  |
+| Tool          | Total time    | Time without `cat`    | `jfmt` speedup factor |
+| ---           | ---           | ---                   | ---                   |
+| `jfmt`        | 837us         | 137us                 | N/A                   |
+| `jq`          | 1,750us       | 1,050us               | 7.7x                  |
+| `json_pp`     | 16,200us      | 15,500us              | 113x                  |
+| `json.tool`   | 18,840us      | 18,140us              | 132x                  |
 
 #### Large files
 
@@ -216,6 +243,7 @@ purpose of `-t null`.
 | Tool              | Total Time    | Time without `cat`    | `jfmt` speedup factor |
 | ---               | ---           | ---                   | ---                   |
 | `jfmt`            | 371.88ms      | 355.21ms              | N/A                   |
+| `json.tool`       | 787.36ms      | 770.69ms              | 2.2x                  |
 | `jq '.'`          | 1,250ms       | 1,233.33ms            | 3.5x                  |
 | `json_pp`         | 27,430ms      | 27,413.33ms           | 77x                   |
 | `json_pp -t null` | 25,310ms      | 25,293.33ms           | 71x                   |
