@@ -41,6 +41,13 @@ You can also install `jfmt` using `cargo`:
 cargo install jfmt
 ```
 
+### From the AUR
+
+_If you don't know what this is, ignore it for now.  Google `arch linux` sometime._
+
+Someone has made an AUR package of this, though it's not maintaned by me. You can
+find it here: https://aur.archlinux.org/packages/jfmt
+
 ### From source
 
 You can checkout the code and build from source to install into your cargo bin
