@@ -102,7 +102,7 @@ struct JfmtConfig {
 
 fn pretty_print(
     input: impl Read,
-    output: impl Write,
+    output: &mut impl Write,
     indent: &str,
 ) -> Result<(), serde_json::error::Error> {
     let mut decoder = Deserializer::from_reader(input);
@@ -112,7 +112,7 @@ fn pretty_print(
     transcode(&mut decoder, &mut encoder)
 }
 
-fn compact_print(input: impl Read, output: impl Write) -> Result<(), serde_json::error::Error> {
+fn compact_print(input: impl Read, output: &mut impl Write) -> Result<(), serde_json::error::Error> {
     let mut decoder = Deserializer::from_reader(input);
     let mut encoder = Serializer::with_formatter(output, CompactFormatter);
 
@@ -245,7 +245,7 @@ fn real_main() -> IOResult<()> {
         get_output_file_name(cfg.in_place, &in_file, &cfg.output, &cfg.input)?;
 
     let reader = get_reader(in_file);
-    let writer = match &out_file_name {
+    let mut writer = match &out_file_name {
         None => get_writer(None),
         Some(x) => {
             let out_file = open_output_file(x, !cfg.in_place)?;
@@ -254,9 +254,14 @@ fn real_main() -> IOResult<()> {
     };
 
     match cfg.format {
-        JSONFormatStyle::Compact => compact_print(reader, writer),
-        JSONFormatStyle::Pretty(indent) => pretty_print(reader, writer, &render_indent(&indent)),
+        JSONFormatStyle::Compact => compact_print(reader, &mut writer),
+        JSONFormatStyle::Pretty(indent) => pretty_print(reader, &mut writer, &render_indent(&indent)),
     }?;
+
+    // Make sure we write a newline at the end of the stream.
+    // It's not FULLY cross-platform, but this works for MOST cases on every
+    // platform I know of, including windows. Even notepad.exe supports it now.
+    writer.write_all(b"\n")?;
 
     if cfg.in_place {
         let out_file_name = out_file_name.unwrap();
