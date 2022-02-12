@@ -167,6 +167,7 @@ class ReleaseActor:
             tdata.setdefault("package", {})["version"] = self.new_version
             with cargotoml.open("w") as tfp:
                 tomlkit.dump(tdata, tfp)
+        cargo_run("generate-lockfile")
 
         pager_run(str(cargotoml))
         if not confirm("Does this Cargo.toml file look right to you?"):
