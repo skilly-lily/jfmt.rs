@@ -54,21 +54,23 @@ jobs:
 
   release:
     name: Publish release
-    if: ${{ startsWith(github.ref, 'refs/tags/') }}
+    if: ${{ startsWith(github.ref, 'refs/tags/v') }}
     needs: build
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v2
       - uses: actions/download-artifact@v2
-      - name: Debug binaries path
-        run: |
-          ls -Al
-          ls -R binaries
+      - name: Get version
+        id: get-version
+        # This strips the '/refs/tags/v' prefix from the tag.  Only used for the changelog.
+        # We can't use github.ref_name because changie doesn't allow v-prefixed versions.
+        run: echo ::set-output name=VERSION::${GITHUB_REF/refs\/tags\/v/}
+
       - uses: softprops/action-gh-release@v1
         with:
-          body_path: changes/${{ github.ref_name }}.md
-          name: v${{ github.ref_name }}
+          body_path: changes/${{ steps.get-version.outputs.VERSION }}.md
+          name: ${{ github.ref_name }}
           files: binaries/jfmt_*
           draft: true
         env:

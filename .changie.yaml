@@ -13,4 +13,5 @@ kinds:
 - label: Deprecated
 - label: Removed
 - label: Fixed
-- label: Security
+- label: Internal
+- label: Maintenance
