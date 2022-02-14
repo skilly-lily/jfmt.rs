@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 from contextlib import contextmanager
+import functools
+from math import floor
 import os
 from pathlib import Path
 import re
@@ -14,13 +16,28 @@ from typing import Callable, Optional, Union, cast
 import requests
 from requests import Response
 import tomlkit
-from tqdm import tqdm
 
 GH_OWNER = "scruffystuffs"
 GH_REPO = "jfmt.rs"
-TIMEOUT = 10 * 60  # 10 min
+TIMEOUT = 15 * 60  # 15 min
+MIN_BUILDTIME = 4 * 60  # 4 min
 WORKFLOW_POLL_SECONDS = 10
 WORKFLOW_NAME = "Publish"
+WORKFLOW_FETCH_DELAY = 10
+
+
+def with_progress(message: str):
+    def progress_dec(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            eprint(message, "...", sep="")
+            rv = func(*args, **kwargs)
+            eprint(message, ": Complete!", sep="")
+            return rv
+
+        return wrapper
+
+    return progress_dec
 
 
 class Github:
@@ -39,18 +56,22 @@ class Github:
     def workflow_id(self) -> int:
         if not self._workflow_id:
             self._workflow_id = self._fetch_workflow_id()
-        return self._workflow_id
+        return cast(int, self._workflow_id)
 
     def wait_for_commit_workflow_success(self, commit: str):
         run_id = self._get_run_id_for_commit(commit)
         self._wait_for_workflow_run(run_id)
 
     def _wait_for_workflow_run(self, run_id: int):
-        for _ in tqdm(timeout_iter(TIMEOUT)):
+        eprint("Builds take a while, we start polling after a minimum wait time...")
+        hold_with_sticky("Holding until build delay has elapsed", MIN_BUILDTIME)
+        for _ in timeout_iter(TIMEOUT):
             run = self._get_via_repo("actions", "runs", str(run_id)).json()
             status = run["status"]
             if not status == "completed":
-                eprint(f"Workflow not completed, current status: {status}")
+                eprint(
+                    f"Workflow not completed, current status: {status}, sleeping for {WORKFLOW_POLL_SECONDS} seconds..."
+                )
                 time.sleep(WORKFLOW_POLL_SECONDS)
                 continue
             conclusion = run["conclusion"]
@@ -70,6 +91,7 @@ class Github:
 
     def _get_run_id_by(self, func: Callable[[dict], bool]) -> int:
         backoff = 1
+        hold_with_sticky("Delaying run_id fetch to avoid conflicts", WORKFLOW_FETCH_DELAY)
         for _retry in range(4):
             all_runs = self._get_via_repo(
                 "actions", "workflows", str(self.workflow_id), "runs"
@@ -86,15 +108,16 @@ class Github:
         raise AssertionError("No workflow runs found after 4 tries.")
 
     def wait_for_release_workflow(self, version: str):
-        self._get_run_id_for_tag(version)
+        run_id = self._get_run_id_for_tag(version)
+        self._wait_for_workflow_run(run_id)
 
+    @with_progress("Fetching workflow id")
     def _fetch_workflow_id(self) -> int:
-        with progress("Fetching workflow id"):
-            jdata = self._get_via_repo("actions", "workflows").json()
-            for item in jdata["workflows"]:
-                if item["name"] == WORKFLOW_NAME:
-                    return item["id"]
-            raise AssertionError("No workflow matched the predicate.")
+        jdata = self._get_via_repo("actions", "workflows").json()
+        for item in jdata["workflows"]:
+            if item["name"] == WORKFLOW_NAME:
+                return item["id"]
+        raise AssertionError("No workflow matched the predicate.")
 
     def _get_via_repo(self, *args) -> Response:
         base = f"https://api.github.com/repos/{GH_OWNER}/{GH_REPO}"
@@ -158,7 +181,7 @@ class ReleaseActor:
 
     def update_cargo_toml(self):
         cargotoml = self.root / "Cargo.toml"
-        backup = cargotoml.with_suffix("toml.bak")
+        backup = cargotoml.with_suffix(".toml.bak")
         with progress("Backing up cargo.toml"):
             shutil.copy(cargotoml, backup)
         with progress("Editing cargo.toml version"):
@@ -167,7 +190,6 @@ class ReleaseActor:
             tdata.setdefault("package", {})["version"] = self.new_version
             with cargotoml.open("w") as tfp:
                 tomlkit.dump(tdata, tfp)
-        cargo_run("generate-lockfile")
 
         pager_run(str(cargotoml))
         if not confirm("Does this Cargo.toml file look right to you?"):
@@ -175,13 +197,14 @@ class ReleaseActor:
             backup.rename(cargotoml)
             raise Exception("Cargo.toml edits rejected by user.")
         backup.unlink()
+        cargo_run("generate-lockfile")
 
+    @with_progress("Updating changelog")
     def update_changelog(self):
-        with progress("Updating changelog"):
-            changie_run("batch", self.new_version)
-            changie_run("merge")
+        changie_run("batch", self.new_version)
+        changie_run("merge")
 
-    def commit_changelog(self):
+    def commit_release(self):
         commit_changes(self.new_version, self.root)
         self._state.did_commit_run = True
 
@@ -219,7 +242,7 @@ class ReleaseActor:
 def _proc_run(
     *args, procname: str, capture: bool = False, allow_err: bool = False
 ) -> Union[str, bool]:
-    eprint("Running command:", *list(procname, *args))
+    eprint("Running command:", *[procname, *args])
     try:
         proc = subprocess.run(
             [procname] + list(args), capture_output=capture, text=True, check=True
@@ -246,7 +269,7 @@ def timeout_iter(timeout_seconds: int):
 
 def pager_run(filename: str):
     pager = os.getenv("PAGER", "less")
-    _proc_run(filename, procname=pager, capture=True, allow_err=True)
+    _proc_run(filename, procname=pager, allow_err=True)
 
 
 def changie_run(
@@ -258,16 +281,21 @@ def changie_run(
 def git_run(*args, capture: bool = False, allow_err: bool = False) -> Union[str, bool]:
     return _proc_run(*args, procname="git", capture=capture, allow_err=allow_err)
 
-def cargo_run(*args, capture: bool = False, allow_err: bool = False) -> Union[str, bool]:
+
+def cargo_run(
+    *args, capture: bool = False, allow_err: bool = False
+) -> Union[str, bool]:
     return _proc_run(*args, procname="cargo", capture=capture, allow_err=allow_err)
 
 
 def confirm(msg: str) -> bool:
-    answer = input(f"{msg}: [y/N]")
+    answer = input(f"{msg} [y/N]: ")
+    if not answer:
+        return False
     answer = answer[0].lower()
     if answer == "y":
         return True
-    if answer in ["n", "\n"]:
+    if answer in ["n"]:
         return False
     print("Input unrecognized, aborting...", file=sys.stderr)
     sys.exit(1)
@@ -289,6 +317,18 @@ def determine_version(raw_arg: str, root: Path) -> str:
         raise AssertionError(f"Tag for version already exists: {version}")
     return version
 
+def hold_with_sticky(msg: str, seconds: int):
+    delay = 0.5
+    start = time.monotonic()
+    elapsed = start
+    line = ""
+    while elapsed < start + seconds:
+        remaining_seconds = floor(start + seconds - elapsed)
+        line = f"{msg}: {remaining_seconds: >5}s remaining"
+        eprint(line, end="\r")
+        time.sleep(delay)
+        elapsed = time.monotonic()
+    eprint(" " * len(line), end="\r")
 
 def eprint(*args, **kwargs):
     kwargs["file"] = sys.stderr
@@ -303,11 +343,11 @@ def progress(message: str):
 
 
 def find_root() -> Path:
-    folder = Path().resolve()
-    root = Path(folder.root)
-    while folder != root:
-        candidate = folder / "Cargo.toml"
-        if candidate.is_file():
+    candidate = Path().resolve()
+    root = Path(candidate.root)
+    while candidate != root:
+        indicator = candidate / "Cargo.toml"
+        if indicator.is_file():
             return candidate
         candidate = candidate.parent
     raise FileNotFoundError("Could not find Cargo.toml.")
@@ -321,6 +361,7 @@ def commit_changes(version: str, root: Path):
             root / "Cargo.lock",
             root / "changes" / f"{version}.md",
             root / "CHANGELOG.md",
+            root / "changes" / "unreleased",
         ],
     )
     git_run("add", *file_list)
@@ -354,7 +395,7 @@ def main():
     actor.update_changelog()
 
     # Commit with bump message
-    actor.commit_changelog()
+    actor.commit_release()
 
     # Push to master
     # Wait for master workflow to complete
