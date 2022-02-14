@@ -72,6 +72,5 @@ jobs:
           body_path: changes/${{ steps.get-version.outputs.VERSION }}.md
           name: ${{ github.ref_name }}
           files: binaries/jfmt_*
-          draft: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
